@@ -52,9 +52,28 @@ struct HAVFormat {
 };
 struct HAVCodec {
 	AVCodecContext *ctx = nullptr;
-	HAVCodec() {
+	const AVCodec *codec = nullptr;
+	HAVCodec(const AVCodecParameters *par) {
 		//alloc memory for codec context
 		ctx = avcodec_alloc_context3(NULL);
+		// retrieve codec params from format context
+		if (avcodec_parameters_to_context(ctx, par) < 0) {
+			av_log(NULL, AV_LOG_ERROR, "Cannot get codec parameters\n");
+			exit(-1);
+		}
+		
+		// find decoding codec
+		codec = avcodec_find_decoder(ctx->codec_id);
+		if (codec == nullptr) {
+			av_log(NULL, AV_LOG_ERROR, "No decoder found\n");
+			exit(-1);
+		}
+
+		// try to open codec
+		if (avcodec_open2(ctx, codec, NULL) < 0) {
+			av_log(NULL, AV_LOG_ERROR, "Cannot open video decoder\n");
+			exit(-1);
+		}
 	}
 	~HAVCodec() {
 		// close context
@@ -64,11 +83,8 @@ struct HAVCodec {
 	}
 };
 
-int main()
-{
-	
+int main() {
 	// declare format and codec contexts, also codec for decoding
-	int ret;
 	char *filename = "../fuck.wmv";
 
 	HAVFormat format(filename);
@@ -81,29 +97,9 @@ int main()
 	// dump video stream info
 	av_dump_format(format.ctx, format.video_stream_id.value(), filename, false);
 
-	HAVCodec havcodec;
+	HAVCodec havcodec(format.ctx->streams[format.video_stream_id.value()]->codecpar);
 
-	// retrieve codec params from format context
-	if (ret = avcodec_parameters_to_context(havcodec.ctx, format.ctx->streams[format.video_stream_id.value()]->codecpar) < 0)
-	{
-		av_log(NULL, AV_LOG_ERROR, "Cannot get codec parameters\n");
-	}
-		
-	// find decoding codec
-	auto Codec = avcodec_find_decoder(havcodec.ctx->codec_id);
-
-	if (Codec == NULL)
-	{
-		av_log(NULL, AV_LOG_ERROR, "No decoder found\n");
-	}
-
-	// try to open codec
-	if (ret = avcodec_open2(havcodec.ctx, Codec, NULL) < 0)
-	{
-		av_log(NULL, AV_LOG_ERROR, "Cannot open video decoder\n");
-	}
-
-	fmt::print("\nDecoding codec is : {}\n", Codec->name);
+	fmt::print("\nDecoding codec is : {}\n", havcodec.codec->name);
 
 	return 0;
 }
