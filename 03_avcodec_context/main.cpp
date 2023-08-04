@@ -1,12 +1,14 @@
 #include <stdio.h>
 #include <fmt/format.h>
 #include <optional>
-
+#include <string>
+#include <unordered_map>
 
 extern "C"
 {
 	// include format and codec headers
 #include <libavformat\avformat.h>
+#include <libavutil\dict.h>
 #include <libavcodec\avcodec.h>
 
 }
@@ -14,6 +16,7 @@ extern "C"
 struct HAVFormat {
 	AVFormatContext *ctx = nullptr;
 	std::optional<int> video_stream_id = std::nullopt;
+	std::unordered_map<std::string, std::string> tags;
 	HAVFormat(const char* filename) {
 		//fill format context with file info
 		if (auto ret = avformat_open_input(&ctx, filename, NULL, NULL)) {
@@ -31,6 +34,10 @@ struct HAVFormat {
 				video_stream_id = i;
 				break;
 			}
+		}
+		AVDictionaryEntry *tag = nullptr;
+		while (tag = av_dict_get(ctx->metadata, "", tag, AV_DICT_IGNORE_SUFFIX)) {
+			tags[tag->key] = tag->value;
 		}
 	}
 	unsigned int get_nb_stream() {
